@@ -1,0 +1,17 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "pkgs": [
+      "cmake",
+      "gcc",
+      "g++",
+      "libopencv-dev",
+      "python3-dev",
+      "libgl1-mesa-glx"
+    ]
+  },
+  "deploy": {
+    "startCommand": "gunicorn app:app",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
