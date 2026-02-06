@@ -1,9 +1,6 @@
 flask
-flask-cors
 face-recognition
 opencv-python-headless
-gunicorn
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-google-api-python-client
+gspread
+oauth2client
+numpy==1.24.3
