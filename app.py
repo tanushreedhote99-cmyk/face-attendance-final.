@@ -42,7 +42,6 @@ if os.path.exists(DATASET_PATH):
             if enc:
                 known_encodings.append(enc[0])
                 known_names.append(name)
-print(f"✅ AI Ready! Total {len(known_names)} faces loaded.")
 
 def gen_frames():
     global attendance_done, current_user, last_time, last_date
@@ -50,12 +49,10 @@ def gen_frames():
     
     while True:
         if attendance_done:
-            cap.release()
             break
 
         success, frame = cap.read()
-        if not success:
-            break
+        if not success: break
 
         small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
         rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
@@ -64,8 +61,6 @@ def gen_frames():
 
         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
             matches = face_recognition.compare_faces(known_encodings, face_encoding, tolerance=0.4)
-            name = "Unknown"
-
             if True in matches:
                 idx = matches.index(True)
                 name = known_names[idx]
@@ -75,22 +70,15 @@ def gen_frames():
                     now = datetime.now()
                     last_time = now.strftime('%H:%M:%S')
                     last_date = now.strftime('%d-%m-%Y')
-                    try:
-                        sheet.append_row([name, last_time, last_date])
-                        attendance_done = True 
-                    except:
-                        print("⚠️ Sheet Error")
-
-            top *= 4; right *= 4; bottom *= 4; left *= 4
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-            cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    sheet.append_row([name, last_time, last_date])
+                    attendance_done = True 
+                    break # Loop se bahar
 
         ret, buffer = cv2.imencode('.jpg', frame)
         yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
-        if attendance_done:
-            cap.release()
-            break
+    cap.release() # CAMERA HARDWARE BAND HOGA
+    cv2.destroyAllWindows()
 
 @app.route('/')
 def index():
@@ -103,13 +91,7 @@ def video_feed():
 
 @app.route('/get_data')
 def get_data():
-    return jsonify({
-        "name": current_user,
-        "time": last_time,
-        "date": last_date,
-        "status": "Done" if attendance_done else "Scanning"
-    })
+    return jsonify({"name": current_user, "time": last_time, "date": last_date, "status": "Done" if attendance_done else "Scanning"})
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
