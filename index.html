@@ -2,103 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Face Attendance Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { background: #0f172a; color: white; font-family: 'Roboto', sans-serif; overflow-x: hidden; }
-        .navbar { background: #1e293b; border-bottom: 2px solid #3b82f6; padding: 1rem; }
-        .nav-title { font-family: 'Orbitron', sans-serif; letter-spacing: 2px; color: #3b82f6; font-weight: bold; }
-        
-        .camera-section { position: relative; border: 4px solid #1e293b; border-radius: 15px; overflow: hidden; box-shadow: 0 0 30px rgba(59, 130, 246, 0.3); }
-        .camera-feed { width: 100%; height: auto; display: block; }
-        
-        .stats-card { background: #1e293b; border-radius: 12px; padding: 20px; border-left: 5px solid #3b82f6; height: 100%; }
-        .status-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e; margin-right: 8px; animation: pulse 2s infinite; }
-        
-        .label { color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 5px; }
-        .value { font-size: 1.4rem; font-weight: bold; color: #f8fafc; font-family: 'Orbitron', sans-serif; }
-        
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-        .footer { margin-top: 30px; color: #64748b; font-size: 0.9rem; }
+        body { background: #0f172a; color: white; font-family: sans-serif; }
+        .camera-section { border: 4px solid #1e293b; border-radius: 15px; overflow: hidden; background: #000; min-height: 400px; display: flex; align-items: center; justify-content: center; }
+        .stats-card { background: #1e293b; border-radius: 12px; padding: 20px; border-left: 5px solid #3b82f6; margin-bottom: 10px; }
+        .value { font-size: 1.4rem; font-weight: bold; font-family: 'Orbitron', sans-serif; }
     </style>
 </head>
 <body>
-
-<nav class="navbar mb-4">
-    <div class="container">
-        <span class="navbar-brand nav-title">CODELINE.AI ATTENDANCE SYSTEM</span>
-        <div class="d-flex align-items-center">
-            <span class="status-indicator"></span>
-            <span class="text-success fw-bold">SYSTEM LIVE</span>
-        </div>
-    </div>
-</nav>
-
-<div class="container">
-    <div class="row g-4">
-        <div class="col-lg-8">
+<div class="container mt-4">
+    <h2 class="text-center mb-4" style="font-family: 'Orbitron';">CODELINE.AI DASHBOARD</h2>
+    <div class="row">
+        <div class="col-md-8">
             <div class="camera-section">
-                <img src="{{ url_for('video_feed') }}" class="camera-feed" alt="Camera Feed">
+                <img src="{{ url_for('video_feed') }}" id="feed" style="width:100%;">
+                <h1 id="msg" style="display:none; color:#22c55e;">✅ ATTENDANCE DONE</h1>
             </div>
         </div>
-
-        <div class="col-lg-4">
-            <div class="row g-3">
-                <div class="col-12">
-                    <div class="stats-card">
-                        <div class="label">Detected Identity</div>
-                        <div id="name" class="value text-primary">Scanning...</div>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="stats-card" style="border-left-color: #eab308;">
-                        <div class="label">Time Captured</div>
-                        <div id="time" class="value">--:--:--</div>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="stats-card" style="border-left-color: #ec4899;">
-                        <div class="label">Current Date</div>
-                        <div id="date" class="value">--/--/----</div>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="stats-card" style="border-left-color: #22c55e;">
-                        <div class="label">Sheet Sync Status</div>
-                        <div class="value" style="font-size: 1rem;">ACTIVE & SECURED</div>
-                    </div>
-                </div>
-            </div>
+        <div class="col-md-4">
+            <div class="stats-card"><div>Name</div><div id="name" class="value">Scanning...</div></div>
+            <div class="stats-card"><div>Time</div><div id="time" class="value">--:--:--</div></div>
+            <div class="stats-card"><div>Date</div><div id="date" class="value">--/--/----</div></div>
         </div>
-    </div>
-
-    <div class="footer text-center">
-        <p>&copy; 2026 AI Vision Systems | Automated Attendance Terminal</p>
     </div>
 </div>
 
 <script>
-    setInterval(function() {
+    let checkStatus = setInterval(function() {
         fetch('/get_data')
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                const nameEl = document.getElementById('name');
-                nameEl.innerText = data.name;
-                
-                // Name highlight color change
-                if(data.name !== "Scanning..." && data.name !== "Unknown") {
-                    nameEl.classList.remove('text-primary');
-                    nameEl.classList.add('text-success');
-                }
-                
+                document.getElementById('name').innerText = data.name;
                 document.getElementById('time').innerText = data.time;
                 document.getElementById('date').innerText = data.date;
-            })
-            .catch(err => console.error("Data Fetch Error:", err));
+
+                if (data.status === "Done") {
+                    document.getElementById('feed').src = ""; // Clear Image
+                    document.getElementById('feed').style.display = "none"; // Hide Image
+                    document.getElementById('msg').style.display = "block"; // Show Success Text
+                    window.stop(); // BROWSER DATA FETCH STOP KAREGA
+                    clearInterval(checkStatus); // SCRIPT STOP KAREGI
+                }
+            });
     }, 1000);
 </script>
-
 </body>
 </html>
