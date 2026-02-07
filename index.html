@@ -2,52 +2,98 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AI Face Attendance Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Face Attendance</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { background: #0f172a; color: white; font-family: sans-serif; }
-        .camera-section { border: 4px solid #1e293b; border-radius: 15px; overflow: hidden; background: #000; min-height: 400px; display: flex; align-items: center; justify-content: center; }
+        body { background: #0f172a; color: white; font-family: sans-serif; overflow-x: hidden; }
+        .camera-container { position: relative; width: 100%; max-width: 600px; margin: auto; border: 4px solid #1e293b; border-radius: 15px; overflow: hidden; background: #000; }
+        video { width: 100%; transform: scaleX(-1); display: block; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); z-index: 5; }
         .stats-card { background: #1e293b; border-radius: 12px; padding: 20px; border-left: 5px solid #3b82f6; margin-bottom: 10px; }
-        .value { font-size: 1.4rem; font-weight: bold; font-family: 'Orbitron', sans-serif; }
+        .value { font-family: 'Orbitron'; font-size: 1.3rem; color: #3b82f6; }
+        #done-msg { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(15,23,42,0.9); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:10; }
     </style>
 </head>
 <body>
 <div class="container mt-4">
-    <h2 class="text-center mb-4" style="font-family: 'Orbitron';">CODELINE.AI DASHBOARD</h2>
+    <h2 class="text-center mb-4" style="font-family: 'Orbitron';">CODELINE.AI LIVE SYSTEM</h2>
     <div class="row">
         <div class="col-md-8">
-            <div class="camera-section">
-                <img src="{{ url_for('video_feed') }}" id="feed" style="width:100%;">
-                <h1 id="msg" style="display:none; color:#22c55e;">✅ ATTENDANCE DONE</h1>
+            <div class="camera-container">
+                <div id="done-msg">
+                    <h2 class="text-success">✅ ATTENDANCE MARKED</h2>
+                    <button onclick="location.reload()" class="btn btn-outline-light mt-3">Reset Scanner</button>
+                </div>
+                <video id="video" autoplay playsinline></video>
+                <canvas id="overlay"></canvas>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stats-card"><div>Name</div><div id="name" class="value">Scanning...</div></div>
-            <div class="stats-card"><div>Time</div><div id="time" class="value">--:--:--</div></div>
-            <div class="stats-card"><div>Date</div><div id="date" class="value">--/--/----</div></div>
+            <div class="stats-card"><div>Identity</div><div id="disp-name" class="value">Scanning...</div></div>
+            <div class="stats-card" style="border-left-color: #eab308;"><div>Time</div><div id="disp-time" class="value">--:--:--</div></div>
+            <div class="stats-card" style="border-left-color: #ec4899;"><div>Date</div><div id="disp-date" class="value">--/--/----</div></div>
         </div>
     </div>
 </div>
+<canvas id="hidden-canvas" style="display:none;"></canvas>
 
 <script>
-    let checkStatus = setInterval(function() {
-        fetch('/get_data')
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('name').innerText = data.name;
-                document.getElementById('time').innerText = data.time;
-                document.getElementById('date').innerText = data.date;
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const canvas = document.getElementById('hidden-canvas');
+    let isDone = false;
 
-                if (data.status === "Done") {
-                    document.getElementById('feed').src = ""; // Clear Image
-                    document.getElementById('feed').style.display = "none"; // Hide Image
-                    document.getElementById('msg').style.display = "block"; // Show Success Text
-                    window.stop(); // BROWSER DATA FETCH STOP KAREGA
-                    clearInterval(checkStatus); // SCRIPT STOP KAREGI
-                }
-            });
-    }, 1000);
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then(stream => { video.srcObject = stream; })
+        .catch(err => alert("Camera error: " + err));
+
+    function process() {
+        if (isDone) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = 400; canvas.height = 300;
+        ctx.drawImage(video, 0, 0, 400, 300);
+        const data = canvas.toDataURL('image/jpeg', 0.5);
+
+        fetch('/process_frame', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: data })
+        })
+        .then(r => r.json())
+        .then(data => {
+            const oCtx = overlay.getContext('2d');
+            overlay.width = video.videoWidth;
+            overlay.height = video.videoHeight;
+            oCtx.clearRect(0, 0, overlay.width, overlay.height);
+
+            if (data.faces) {
+                const sX = overlay.width / 400;
+                const sY = overlay.height / 300;
+                data.faces.forEach(f => {
+                    oCtx.strokeStyle = f.color === "green" ? "#00ff00" : "#ff0000";
+                    oCtx.lineWidth = 4;
+                    oCtx.strokeRect(f.box[3]*sX, f.box[0]*sY, (f.box[1]-f.box[3])*sX, (f.box[2]-f.box[0])*sY);
+                    oCtx.fillStyle = f.color === "green" ? "#00ff00" : "#ff0000";
+                    oCtx.font = "bold 20px Arial";
+                    oCtx.fillText(f.name, f.box[3]*sX, f.box[0]*sY - 10);
+                });
+            }
+
+            if (data.status === "Success") {
+                isDone = true;
+                document.getElementById('disp-name').innerText = data.name;
+                document.getElementById('disp-time').innerText = data.time;
+                document.getElementById('disp-date').innerText = data.date;
+                document.getElementById('done-msg').style.display = 'flex';
+                video.srcObject.getTracks().forEach(t => t.stop());
+            } else {
+                document.getElementById('disp-name').innerText = data.name;
+            }
+        });
+    }
+    setInterval(process, 1000);
 </script>
 </body>
 </html>
